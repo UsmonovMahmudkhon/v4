@@ -12,23 +12,28 @@ function init() {
     container = document.createElement('div');
     document.body.appendChild(container);
 
+    // Setup scene
     scene = new THREE.Scene();
 
+    // Setup camera
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
+    // Setup renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
+    // AR button for entering AR mode
     document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
+    // Lighting
     const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     light.position.set(0.5, 1, 0.25);
     scene.add(light);
 
-    // Reticle for object placement
+    // Reticle
     const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
     const material = new THREE.MeshBasicMaterial();
     reticle = new THREE.Mesh(geometry, material);
@@ -41,7 +46,7 @@ function init() {
     controller.addEventListener('select', onSelect);
     scene.add(controller);
 
-    // Image Upload Handling
+    // Image upload handling
     const imageUpload = document.getElementById('imageUpload');
     imageUpload.addEventListener('change', onImageUpload);
 
@@ -62,9 +67,9 @@ function onImageUpload(event) {
             const material = new THREE.MeshBasicMaterial({ map: texture });
             const geometry = new THREE.PlaneGeometry(1, 1);
             currentImageMesh = new THREE.Mesh(geometry, material);
-            console.log('Image mesh created:', currentImageMesh); // Debugging log
+            console.log('Image mesh created:', currentImageMesh);
         }, undefined, function (err) {
-            console.error('An error occurred:', err); // Error handling
+            console.error('An error occurred:', err);
         });
     };
 
@@ -76,7 +81,7 @@ function onSelect() {
         currentImageMesh.position.setFromMatrixPosition(reticle.matrix);
         currentImageMesh.quaternion.setFromRotationMatrix(reticle.matrix);
         scene.add(currentImageMesh);
-        console.log('Image placed at:', currentImageMesh.position); // Debugging log
+        console.log('Image placed at:', currentImageMesh.position);
     }
 }
 
@@ -104,14 +109,11 @@ function render(timestamp, frame) {
 
         const viewerPose = frame.getViewerPose(referenceSpace);
 
-        const hitTestResults = frame.getHitTestResults(session.requestHitTestSource({
-            space: viewerPose.views[0].space,
-            offsetRay: new XRRay(new DOMPoint(0, 0, 0))
-        }));
+        const hitTestSource = session.requestHitTestSource({ space: referenceSpace });
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
 
         if (hitTestResults.length > 0) {
             const hit = hitTestResults[0];
-
             reticle.visible = true;
             reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
         } else {
