@@ -6,38 +6,38 @@ let reticle, controller;
 let currentImageMesh = null;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
-let session;
 
-document.getElementById('arButton').addEventListener('click', startAR);
+init();
 
-function startAR() {
-    // Hide the AR button
-    document.getElementById('arButton').style.display = 'none';
-
-    initThreeJS();
-    initAR();
-}
-
-function initThreeJS() {
-    // Create Three.js scene
+function init() {
     container = document.getElementById('container');
 
+    // Setup scene
     scene = new THREE.Scene();
 
+    // Setup camera
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
+    // Setup renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Add lighting
+    // Custom AR button setup
+    const arButton = document.getElementById('arButton');
+    arButton.addEventListener('click', () => {
+        document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+        arButton.style.display = 'none';
+        renderer.setAnimationLoop(animate);
+    });
+
     const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     light.position.set(0.5, 1, 0.25);
     scene.add(light);
 
-    // Add reticle
+    // Reticle for object placement
     const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
     const material = new THREE.MeshBasicMaterial();
     reticle = new THREE.Mesh(geometry, material);
@@ -45,42 +45,42 @@ function initThreeJS() {
     reticle.visible = false;
     scene.add(reticle);
 
-    // Add controller
+    // Controller for interacting with the AR scene
     controller = renderer.xr.getController(0);
     controller.addEventListener('select', onSelect);
     scene.add(controller);
 
-    // Handle gestures
+    // Image Upload Handling
+    const imageUpload = document.getElementById('imageUpload');
+    imageUpload.addEventListener('change', onImageUpload);
+
+    // Gesture handling
     const hammer = new Hammer(renderer.domElement);
     hammer.get('pinch').set({ enable: true });
     hammer.on('pinch', onPinch);
     hammer.on('rotate', onRotate);
 
-    // Handle window resize
+    // Handling resize
     window.addEventListener('resize', onWindowResize);
 }
 
-function initAR() {
-    // Request AR session
-    navigator.xr.requestSession('immersive-ar', {
-        requiredFeatures: ['hit-test']
-    }).then((xrSession) => {
-        session = xrSession;
-        renderer.xr.setSession(xrSession);
-        session.addEventListener('end', onSessionEnd);
-        xrSession.requestReferenceSpace('viewer').then((referenceSpace) => {
-            xrSession.requestHitTestSource({ space: referenceSpace }).then((source) => {
-                hitTestSource = source;
-            });
-        });
-    });
-}
+function onImageUpload(event) {
+    const file = event.target.files[0];
+    const reader = new FileReader();
 
-function onSessionEnd() {
-    hitTestSourceRequested = false;
-    hitTestSource = null;
-    session = null;
-    document.getElementById('arButton').style.display = 'block';
+    reader.onload = function (e) {
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(e.target.result, function (texture) {
+            const material = new THREE.MeshBasicMaterial({ map: texture });
+            const geometry = new THREE.PlaneGeometry(1, 1);
+            currentImageMesh = new THREE.Mesh(geometry, material);
+            console.log('Image mesh created:', currentImageMesh);
+        }, undefined, function (err) {
+            console.error('An error occurred:', err);
+        });
+    };
+
+    reader.readAsDataURL(file);
 }
 
 function onSelect() {
@@ -88,6 +88,7 @@ function onSelect() {
         currentImageMesh.position.setFromMatrixPosition(reticle.matrix);
         currentImageMesh.quaternion.setFromRotationMatrix(reticle.matrix);
         scene.add(currentImageMesh);
+        console.log('Image placed at:', currentImageMesh.position);
     }
 }
 
@@ -104,36 +105,32 @@ function onRotate(event) {
     }
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
 function animate() {
     renderer.setAnimationLoop(render);
 }
 
 function render(timestamp, frame) {
     if (frame) {
-        const referenceSpace = renderer.xr.getReferenceSpace();
         const session = renderer.xr.getSession();
-
         if (!hitTestSourceRequested) {
             session.requestReferenceSpace('viewer').then((referenceSpace) => {
                 session.requestHitTestSource({ space: referenceSpace }).then((source) => {
                     hitTestSource = source;
                 });
             });
+
             session.addEventListener('end', () => {
                 hitTestSourceRequested = false;
                 hitTestSource = null;
             });
+
             hitTestSourceRequested = true;
         }
 
         if (hitTestSource) {
+            const referenceSpace = renderer.xr.getReferenceSpace();
             const viewerPose = frame.getViewerPose(referenceSpace);
+
             if (viewerPose) {
                 const hitTestResults = frame.getHitTestResults(hitTestSource);
 
@@ -151,22 +148,8 @@ function render(timestamp, frame) {
     renderer.render(scene, camera);
 }
 
-document.getElementById('imageUpload').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = function (e) {
-        const textureLoader = new THREE.TextureLoader();
-        textureLoader.load(e.target.result, function (texture) {
-            const material = new THREE.MeshBasicMaterial({ map: texture });
-            const geometry = new THREE.PlaneGeometry(1, 1);
-            currentImageMesh = new THREE.Mesh(geometry, material);
-            currentImageMesh.visible = false;
-            scene.add(currentImageMesh);
-        });
-    };
-
-    reader.readAsDataURL(file);
-});
-
-animate();
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
