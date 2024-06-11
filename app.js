@@ -6,6 +6,7 @@ let reticle, controller;
 let currentImageMesh = null;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
+let arButton;
 
 init();
 animate();
@@ -27,7 +28,9 @@ function init() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+    // Custom AR button setup
+    arButton = document.getElementById('arButton');
+    arButton.addEventListener('click', startAR);
 
     const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     light.position.set(0.5, 1, 0.25);
@@ -41,7 +44,7 @@ function init() {
     reticle.visible = false;
     scene.add(reticle);
 
-    // Controller for interacting with the AR scene
+    // Controller
     controller = renderer.xr.getController(0);
     controller.addEventListener('select', onSelect);
     scene.add(controller);
@@ -58,6 +61,11 @@ function init() {
 
     // Handling resize
     window.addEventListener('resize', onWindowResize);
+}
+
+function startAR() {
+    arButton.style.display = 'none'; // Hide the AR button after clicking
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 }
 
 function onImageUpload(event) {
