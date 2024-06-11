@@ -62,6 +62,9 @@ function onImageUpload(event) {
             const material = new THREE.MeshBasicMaterial({ map: texture });
             const geometry = new THREE.PlaneGeometry(1, 1);
             currentImageMesh = new THREE.Mesh(geometry, material);
+            console.log('Image mesh created:', currentImageMesh); // Debugging log
+        }, undefined, function (err) {
+            console.error('An error occurred:', err); // Error handling
         });
     };
 
@@ -73,6 +76,7 @@ function onSelect() {
         currentImageMesh.position.setFromMatrixPosition(reticle.matrix);
         currentImageMesh.quaternion.setFromRotationMatrix(reticle.matrix);
         scene.add(currentImageMesh);
+        console.log('Image placed at:', currentImageMesh.position); // Debugging log
     }
 }
 
